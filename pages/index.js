@@ -1,67 +1,101 @@
-import Link from 'next/link';
-import { getPosts } from '../utils/mdx-utils';
-
-import Footer from '../components/Footer';
-import Header from '../components/Header';
+import { useState } from 'react';
 import Layout, { GradientBackground } from '../components/Layout';
-import ArrowIcon from '../components/ArrowIcon';
-import { getGlobalData } from '../utils/global-data';
-import SEO from '../components/SEO';
 
-export default function Index({ posts, globalData }) {
+function toKM(m, toFixed = 2) {
+  return (m / 1000).toFixed(toFixed);
+}
+
+function toM(m, toFixed = 2) {
+  return (m * 0.00062137).toFixed(toFixed);
+}
+
+function toHours(s, toFixed = 2) {
+  return (s / 60 / 60).toFixed(toFixed);
+}
+
+export default function Index({
+  count,
+  distance,
+  movingTime,
+  recent_run_totals,
+}) {
+  console.log(count, distance, movingTime, recent_run_totals);
+
+  const [metric, setMetric] = useState(true);
+
   return (
     <Layout>
-      <SEO title={globalData.name} description={globalData.blogTitle} />
-      <Header name={globalData.name} />
-      <main className="w-full">
-        <h1 className="text-3xl lg:text-5xl text-center mb-12">
-          {globalData.blogTitle}
-        </h1>
-        <ul className="w-full">
-          {posts.map((post) => (
-            <li
-              key={post.filePath}
-              className="md:first:rounded-t-lg md:last:rounded-b-lg backdrop-blur-lg bg-white dark:bg-black dark:bg-opacity-30 bg-opacity-10 hover:bg-opacity-20 dark:hover:bg-opacity-50 transition border border-gray-800 dark:border-white border-opacity-10 dark:border-opacity-10 border-b-0 last:border-b hover:border-b hovered-sibling:border-t-0"
-            >
-              <Link
-                as={`/posts/${post.filePath.replace(/\.mdx?$/, '')}`}
-                href={`/posts/[slug]`}
-              >
-                <a className="py-6 lg:py-10 px-6 lg:px-16 block focus:outline-none focus:ring-4">
-                  {post.data.date && (
-                    <p className="uppercase mb-3 font-bold opacity-60">
-                      {post.data.date}
-                    </p>
-                  )}
-                  <h2 className="text-2xl md:text-3xl">{post.data.title}</h2>
-                  {post.data.description && (
-                    <p className="mt-3 text-lg opacity-60">
-                      {post.data.description}
-                    </p>
-                  )}
-                  <ArrowIcon className="mt-4" />
-                </a>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </main>
-      <Footer copyrightText={globalData.footerText} />
-      <GradientBackground
-        variant="large"
-        className="fixed top-20 opacity-40 dark:opacity-60"
-      />
-      <GradientBackground
-        variant="small"
-        className="absolute bottom-0 opacity-20 dark:opacity-10"
-      />
+      <button onClick={() => setMetric((metric) => !metric)}>{`use ${
+        metric ? 'Imperial' : 'Metric'
+      } units`}</button>
+      <h1>Matthew Beaty&apos;s Running Data (strava only)</h1>
+
+      <h2>All Time </h2>
+      <div>Number of Runs: {count} runs</div>
+      <div>
+        {`Total Miles:
+        ${metric ? toKM(distance) + ' kilometers' : toM(distance) + ' miles'}`}
+      </div>
+      <div>Total Moving Time: {toHours(movingTime)} hours</div>
+
+      <h2>Last 4 Week Totals </h2>
+      <div>Number of Runs: {recent_run_totals.count} runs</div>
+      <div>
+        {`Total Miles:
+        ${
+          metric
+            ? toKM(recent_run_totals.distance) + ' kilometers'
+            : toM(recent_run_totals.distance) + ' miles'
+        }`}
+      </div>
+      <div>
+        Total Moving Time: {toHours(recent_run_totals.moving_time)} hours
+      </div>
     </Layout>
   );
 }
 
-export function getStaticProps() {
-  const posts = getPosts();
-  const globalData = getGlobalData();
+export async function getServerSideProps() {
+  const myID = '73196345';
+  // hardcode to my own id for now
+  const athleteID = myID;
 
-  return { props: { posts, globalData } };
+  const headers = {
+    Accept: 'application/json, text/plain, */*',
+    'Content-Type': 'application/json',
+  };
+
+  const body = JSON.stringify({
+    client_id: process.env.STRAVA_CLIENT_ID,
+    client_secret: process.env.STRAVA_SECRET,
+    refresh_token: process.env.STRAVA_REFRESH_TOKEN,
+    grant_type: 'refresh_token',
+  });
+
+  const reauthResponse = await fetch('https://www.strava.com/oauth/token', {
+    method: 'post',
+    headers,
+    body,
+  });
+
+  console.log(reauthResponse);
+
+  const authData = await reauthResponse.json();
+
+  const response = await fetch(
+    `https://www.strava.com/api/v3/athletes/${athleteID}/stats?access_token=${authData.access_token}`
+  );
+
+  // console.log(response);
+  const data = await response.json();
+  const { all_run_totals } = data;
+  const { recent_run_totals } = data;
+
+  const {
+    count,
+    distance,
+    moving_time: movingTime,
+  } = all_run_totals || { count: null, distance: null, moving_time: null };
+
+  return { props: { count, distance, movingTime, recent_run_totals } };
 }
