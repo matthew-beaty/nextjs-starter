@@ -1,65 +1,43 @@
 import { useState } from 'react';
-import Layout, { GradientBackground } from '../components/Layout';
+import Layout from '../components/Layout';
+import StravaSummary from '../components/StravaSummary';
+import useToggle from '../hooks/useToggle';
 
-function toKM(m, toFixed = 2) {
-  return (m / 1000).toFixed(toFixed);
-}
-
-function toM(m, toFixed = 2) {
-  return (m * 0.00062137).toFixed(toFixed);
-}
-
-function toHours(s, toFixed = 2) {
-  return (s / 60 / 60).toFixed(toFixed);
-}
-
-export default function Index({
-  count,
-  distance,
-  movingTime,
-  recent_run_totals,
-}) {
-  console.log(count, distance, movingTime, recent_run_totals);
-
-  const [metric, setMetric] = useState(true);
+export default function Index({ allRunTotals, recentRunTotals }) {
+  const [inMetric, toggleMetric] = useToggle();
 
   return (
     <Layout>
-      <button onClick={() => setMetric((metric) => !metric)}>{`use ${
-        metric ? 'Imperial' : 'Metric'
-      } units`}</button>
-      <h1>Matthew Beaty&apos;s Running Data (strava only)</h1>
-
-      <h2>All Time </h2>
-      <div>Number of Runs: {count} runs</div>
-      <div>
-        {`Total Miles:
-        ${metric ? toKM(distance) + ' kilometers' : toM(distance) + ' miles'}`}
-      </div>
-      <div>Total Moving Time: {toHours(movingTime)} hours</div>
-
-      <h2>Last 4 Week Totals </h2>
-      <div>Number of Runs: {recent_run_totals.count} runs</div>
-      <div>
-        {`Total Miles:
-        ${
-          metric
-            ? toKM(recent_run_totals.distance) + ' kilometers'
-            : toM(recent_run_totals.distance) + ' miles'
-        }`}
-      </div>
-      <div>
-        Total Moving Time: {toHours(recent_run_totals.moving_time)} hours
-      </div>
+      <aside className="border border-white rounded-lg p-2">
+        <div className="flex justify-center">
+          <h1 className="p-4 text-2xl">Running Data (via Strava)</h1>
+        </div>
+        <StravaSummary
+          title="Last 4 Weeks"
+          totals={recentRunTotals}
+          inMetric={inMetric}
+        />
+        <StravaSummary
+          title="All Time"
+          totals={allRunTotals}
+          inMetric={inMetric}
+        />
+        <div className="flex justify-center">
+          <button onClick={toggleMetric}>
+            {inMetric ? 'use Imperial units' : 'use Metric units'}
+          </button>
+        </div>
+      </aside>
     </Layout>
   );
 }
 
 export async function getServerSideProps() {
-  const myID = '73196345';
-  // hardcode to my own id for now
-  const athleteID = myID;
+  const MYSTRAVAID = '73196345';
 
+  // Retrieve auth date since Strava requires getting updated refresh tokens
+  // TODO: for now, we fetch the token every time, but we skip this step by
+  // saving the token somewhere. (currently serverless, so this would have to be client-side)
   const headers = {
     Accept: 'application/json, text/plain, */*',
     'Content-Type': 'application/json',
@@ -72,30 +50,35 @@ export async function getServerSideProps() {
     grant_type: 'refresh_token',
   });
 
-  const reauthResponse = await fetch('https://www.strava.com/oauth/token', {
-    method: 'post',
-    headers,
-    body,
-  });
+  try {
+    const reauthResponse = await fetch('https://www.strava.com/oauth/token', {
+      method: 'post',
+      headers,
+      body,
+    });
+    const authData = await reauthResponse.json();
 
-  console.log(reauthResponse);
+    // Fetch summary stats
+    const response = await fetch(
+      `https://www.strava.com/api/v3/athletes/${MYSTRAVAID}/stats?access_token=${authData.access_token}`
+    );
+    const { all_run_totals, recent_run_totals } = await response.json();
 
-  const authData = await reauthResponse.json();
-
-  const response = await fetch(
-    `https://www.strava.com/api/v3/athletes/${athleteID}/stats?access_token=${authData.access_token}`
-  );
-
-  // console.log(response);
-  const data = await response.json();
-  const { all_run_totals } = data;
-  const { recent_run_totals } = data;
-
-  const {
-    count,
-    distance,
-    moving_time: movingTime,
-  } = all_run_totals || { count: null, distance: null, moving_time: null };
-
-  return { props: { count, distance, movingTime, recent_run_totals } };
+    return {
+      props: {
+        // quick rekey for camelcase
+        allRunTotals: {
+          ...all_run_totals,
+          movingTime: all_run_totals.moving_time,
+        },
+        recentRunTotals: {
+          ...recent_run_totals,
+          movingTime: recent_run_totals.moving_time,
+        },
+      },
+    };
+  } catch (error) {
+    console.log(error);
+    return { props: { allRunTotals: null, recentRunTotals: null } };
+  }
 }
