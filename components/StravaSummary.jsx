@@ -2,13 +2,8 @@ import React from 'react';
 import to from '../utils/to';
 
 export default function Summary({ title, totals, inMetric }) {
-  // if (!totals) return <div>Loading Strava data...</div>;
-  // const { count, distance, movingTime } = totals;
-  const { count, distance, movingTime } = {
-    count: 20,
-    distance: 100,
-    movingTime: 1000,
-  };
+  if (!totals) return <div>Loading Strava data...</div>;
+  const { count, distance, movingTime } = totals;
 
   return (
     <div className="w-80">
