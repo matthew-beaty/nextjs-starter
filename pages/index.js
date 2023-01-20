@@ -6,8 +6,6 @@ import useToggle from '../hooks/useToggle';
 export default function Index({ allRunTotals, recentRunTotals, error }) {
   const [inMetric, toggleMetric] = useToggle();
 
-  if (error) console.log(error);
-
   return (
     <Layout>
       <aside className="border border-white rounded-lg p-2">
@@ -80,7 +78,6 @@ export async function getServerSideProps() {
       },
     };
   } catch (error) {
-    console.log(error);
     return {
       props: {
         allRunTotals: null,

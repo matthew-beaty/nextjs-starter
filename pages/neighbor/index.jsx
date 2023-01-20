@@ -1,105 +1,83 @@
 import React from 'react';
 import Layout from '../../components/Layout';
 import { Wrapper } from '@googlemaps/react-wrapper';
-
-const stephensLoc = { lat: 39.6781676, lng: -104.9134844 };
-const mattsLoc = { lat: 39.90978123117473, lng: -85.13967024434808 };
-
-const render = (status) => {
-  return <h1>{status}</h1>;
-};
-
-function Map({ center, zoom, onClick, children }) {
-  const mapRef = React.useRef();
-  const [map, setMap] = React.useState();
-
-  React.useEffect(() => {
-    setMap(
-      new window.google.maps.Map(mapRef.current, {
-        center,
-        zoom,
-      })
-    );
-  }, [mapRef]);
-
-  React.useEffect(() => {
-    if (map && onClick) {
-      console.log('ya');
-      map.addListener('click', onClick);
-    }
-  }, [onClick, map]);
-
-  return (
-    <div ref={mapRef} id="map" style={{ flexGrow: '1', height: '100%' }}>
-      {React.Children.map(children, (child) => {
-        if (React.isValidElement(child)) {
-          // set the map prop on the child component
-          return React.cloneElement(child, { map });
-        }
-      })}
-    </div>
-  );
-}
-
-function Marker(options) {
-  const [marker, setMarker] = React.useState();
-
-  React.useEffect(() => {
-    if (!marker) setMarker(new google.maps.Marker());
-
-    return () => {
-      if (marker) marker.setMap(null);
-    };
-  }, [marker]);
-
-  React.useEffect(() => {
-    if (marker) marker.setOptions(options);
-  }, [marker, options]);
-
-  return null;
-}
-
-const Name = ({ latLng }) => {
-  const [names, setName] = React.useState('');
-
-  return (
-    <div>
-      <p>{JSON.stringify(latLng.toJSON(), null, 2)}</p>
-      <input
-        className=" text-blue-800"
-        name="names"
-        onChange={(e) => setName(e.target.value)}
-        value={names}
-      />
-    </div>
-  );
-};
+import Status from './Status';
+import Marker from './Marker';
+import Map from './Map';
+import Name from './Name';
+import { mattsLoc } from './consts';
 
 export default function Index({ googleMapKey }) {
   const [markers, setMarkers] = React.useState([]);
+  const [activeMarker, setActiveMarker] = React.useState(null);
+
+  React.useEffect(() => {
+    if (window) {
+      const prevMarkers = localStorage.getItem('markers');
+      setMarkers(JSON.parse(prevMarkers) || []);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    localStorage.setItem('markers', JSON.stringify(markers));
+  }, [markers]);
 
   function onClick(e) {
-    console.log(e.latLng);
-    setMarkers([...markers, e.latLng]);
+    setMarkers([...markers, { latLng: e.latLng, name: '' }]);
+  }
+
+  function onChange(e, index) {
+    const name = e.target.value;
+    setMarkers(markers.map((m, i) => (i === index ? { ...m, name } : m)));
+  }
+
+  function removeMarker(index) {
+    setMarkers(markers.filter((m, i) => i !== index));
+  }
+
+  function clearAll() {
+    setMarkers([]);
+    localStorage.removeItem('markers');
   }
 
   return (
     <Layout>
-      <h3 className="text-4xl">hello neighbor</h3>
-      <div className="h-96 w-96 flex">
-        <Wrapper apiKey={googleMapKey} render={render}>
-          <Map center={mattsLoc} zoom={17} onClick={onClick}>
-            {markers.map((latLng, i) => (
-              <Marker key={i} position={latLng} />
-            ))}
-          </Map>
-        </Wrapper>
+      <h3 className="text-4xl mb-10">hello neighbor</h3>
+      <div className="flex w-100 gap-3">
+        <div className="h-96 w-96 flex">
+          <Wrapper apiKey={googleMapKey} render={Status}>
+            <Map center={mattsLoc} zoom={17} onClick={onClick}>
+              {markers.map(({ latLng, name }, i) => (
+                <Marker
+                  key={i}
+                  position={latLng}
+                  label={name}
+                  animation={
+                    i === activeMarker ? google.maps.Animation.BOUNCE : null
+                  }
+                />
+              ))}
+            </Map>
+          </Wrapper>
+        </div>
+        <div>
+          {markers.length === 0 && <p>Click the map to add a new Neighbor</p>}
+          {markers.map(({ latLng, name }, i) => (
+            <div className="flex gap-1" key={i}>
+              <Name
+                onChange={onChange}
+                onFocus={() => setActiveMarker(i)}
+                onBlur={setActiveMarker}
+                latLng={latLng}
+                name={name}
+                id={i}
+              />
+              <button onClick={() => removeMarker(i)}>X</button>
+            </div>
+          ))}
+        </div>
       </div>
-      <div>
-        {markers.map((latLng, i) => (
-          <Name key={i} latLng={latLng} />
-        ))}
-      </div>
+      <button onClick={clearAll}>Clear all</button>
     </Layout>
   );
 }
