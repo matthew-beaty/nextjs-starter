@@ -3,8 +3,10 @@ import Layout from '../components/Layout';
 import StravaSummary from '../components/StravaSummary';
 import useToggle from '../hooks/useToggle';
 
-export default function Index({ allRunTotals, recentRunTotals }) {
+export default function Index({ allRunTotals, recentRunTotals, error }) {
   const [inMetric, toggleMetric] = useToggle();
+
+  if (error) console.log(error);
 
   return (
     <Layout>
@@ -79,6 +81,12 @@ export async function getServerSideProps() {
     };
   } catch (error) {
     console.log(error);
-    return { props: { allRunTotals: null, recentRunTotals: null } };
+    return {
+      props: {
+        allRunTotals: null,
+        recentRunTotals: null,
+        error: error.message,
+      },
+    };
   }
 }
