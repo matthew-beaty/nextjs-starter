@@ -1,11 +1,11 @@
 import React from 'react';
 import Layout from '../../components/Layout';
 import { Wrapper } from '@googlemaps/react-wrapper';
-import Status from './Status';
-import Marker from './Marker';
-import Map from './Map';
-import Name from './Name';
-import { mattsLoc } from './consts';
+import Status from '../../components/Neighbor/Status';
+import Marker from '../../components/Neighbor/Marker';
+import Map from '../../components/Neighbor/Map';
+import Name from '../../components/Neighbor/Name';
+import { mattsLoc } from '../../components/Neighbor/consts';
 
 export default function Index({ googleMapKey }) {
   const [markers, setMarkers] = React.useState([]);
