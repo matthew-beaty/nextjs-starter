@@ -11,7 +11,7 @@ export default function Map({ center, zoom, onClick, children }) {
         zoom,
       })
     );
-  }, [mapRef]);
+  }, [center, mapRef, zoom]);
 
   React.useEffect(() => {
     if (map && onClick) {
